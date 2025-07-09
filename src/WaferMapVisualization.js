@@ -8,6 +8,8 @@ function WaferMapVisualization({ mapData }) {
   const cols = parseInt(mapData.header.Columns);
   const binCounts = new Map();
 
+  console.log('WaferMapVisualization render:', { rows, cols, mapData });
+
   // Count bins
   for (const [_, status] of mapData.dies) {
     binCounts.set(status, (binCounts.get(status) || 0) + 1);
@@ -24,6 +26,8 @@ function WaferMapVisualization({ mapData }) {
     }
     grid.push(row);
   }
+  
+  console.log('Grid created:', { rows, cols, gridLength: grid.length, firstRowLength: grid[0]?.length });
 
   // Bin color mapping
   const binColors = {
@@ -37,20 +41,27 @@ function WaferMapVisualization({ mapData }) {
   return (
     <div className="wafer-map-visualization">
       <div className="map-container">
-        <div className="grid">
-          {grid.map((row, y) => (
-            <div key={y} className="row">
-              {row.map((status, x) => (
-                <div
-                  key={`${x}-${y}`}
-                  className="cell"
-                  style={{ backgroundColor: binColors[status] || "#9E9E9E" }}
-                  title={`Position: (${x},${y}), Status: ${status} - ${status === "01" ? "Pass" : status === "EF" ? "Defect" : status === "FA" ? "Reference" : status === "FF" ? "Null" : status === "FC" ? "Fail Code" : "Unknown"}`}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
+        {grid.length > 0 ? (
+          <div className="grid">
+            {grid.map((row, y) => (
+              <div key={y} className="row">
+                {row.map((status, x) => (
+                  <div
+                    key={`${x}-${y}`}
+                    className="cell"
+                    style={{ backgroundColor: binColors[status] || "#9E9E9E" }}
+                    title={`Position: (${x},${y}), Status: ${status} - ${status === "01" ? "Pass" : status === "EF" ? "Defect" : status === "FA" ? "Reference" : status === "FF" ? "Null" : status === "FC" ? "Fail Code" : "Unknown"}`}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+            <p>No grid data available for visualization</p>
+            <p>Rows: {rows}, Columns: {cols}</p>
+          </div>
+        )}
       </div>
       <div className="bin-stats">
         <h3>Bin Statistics</h3>
