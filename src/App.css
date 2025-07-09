@@ -59,6 +59,96 @@
   font-size: 0.875rem;
 }
 
+/* Visualizer Styles */
+.visualizer-modal .modal-dialog {
+  max-width: 90vw;
+  margin: 1.75rem auto;
+}
+
+.visualizer-modal .modal-content {
+  height: 90vh;
+  border-radius: 0.5rem;
+}
+
+.visualizer-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #fff;
+}
+
+.visualizer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.visualizer-header h5 {
+  margin: 0;
+  color: #495057;
+}
+
+.visualizer-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.visualizer-info {
+  padding: 0.5rem 1rem;
+  background-color: #e9ecef;
+  border-bottom: 1px solid #dee2e6;
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.visualizer-info p {
+  margin: 0.25rem 0;
+}
+
+.wafer-map-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.loading-message {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  background-color: #f8f9fa;
+}
+
+.loading-message p {
+  font-size: 1.1rem;
+  color: #6c757d;
+  margin: 0;
+}
+
+.canvas-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  overflow: hidden;
+}
+
+.canvas-container canvas {
+  border: 2px solid #dee2e6;
+  border-radius: 0.5rem;
+  background-color: #fff;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  max-width: 100%;
+  max-height: 100%;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .card-body {
@@ -72,6 +162,26 @@
   .btn-sm {
     padding: 0.2rem 0.4rem;
     font-size: 0.8rem;
+  }
+
+  .visualizer-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .visualizer-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .visualizer-modal .modal-dialog {
+    max-width: 95vw;
+    margin: 0.5rem auto;
+  }
+
+  .visualizer-modal .modal-content {
+    height: 95vh;
   }
 }
 

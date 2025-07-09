@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Container, Navbar, Nav, Button, Modal, Form, Alert } from 'react-bootstrap';
+import WaferMapVisualization from './WaferMapVisualization';
+import { parseG85 } from './G85Parser';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -17,6 +19,7 @@ const mockLots = [
     uploadedBy: 'user1',
     uploadDate: '2024-01-15',
     status: 'pending',
+    mapData: null,
     defects: [
       { x: 10, y: 20, defectType: 'scratch', severity: 'minor' },
       { x: 45, y: 67, defectType: 'dent', severity: 'major' }
@@ -28,17 +31,118 @@ const mockLots = [
     uploadedBy: 'user1',
     uploadDate: '2024-01-16',
     status: 'approved',
+    mapData: null,
     defects: [
       { x: 15, y: 25, defectType: 'scratch', severity: 'minor' }
     ]
   }
 ];
 
+// G85 to Wafer Map Converter (updated for professional G85 data)
+const convertG85ToWaferMap = (mapData) => {
+  if (!mapData || !mapData.header) {
+    return null;
+  }
+
+  // Use the actual header data from the G85 file
+  const rows = parseInt(mapData.header.Rows);
+  const cols = parseInt(mapData.header.Columns);
+  
+  // Create dies map from the parsed G85 data
+  const dies = new Map();
+  
+  // Copy all dies from the parsed G85 data
+  for (const [coord, status] of mapData.dies) {
+    dies.set(coord, status);
+  }
+  
+  return {
+    header: {
+      Rows: rows,
+      Columns: cols,
+      LotID: mapData.header.LotId || 'Unknown',
+      WaferID: mapData.mapAttributes.SubstrateNumber || 'Unknown',
+      TestDate: mapData.header.CreateDate || new Date().toISOString().split('T')[0],
+      ProductId: mapData.header.ProductId || 'Unknown',
+      SupplierName: mapData.header.SupplierName || 'Unknown'
+    },
+    dies: dies
+  };
+};
+
+// Wafer Map Visualizer Component
+const WaferMapVisualizer = ({ mapData, filename, onClose }) => {
+  const [waferMapData, setWaferMapData] = useState(null);
+
+  useEffect(() => {
+    if (mapData) {
+      const waferData = convertG85ToWaferMap(mapData);
+      setWaferMapData(waferData);
+    }
+  }, [mapData]);
+
+  if (!mapData) {
+    return (
+      <div className="visualizer-container">
+        <div className="visualizer-header">
+          <h5>Wafer Map Visualization: {filename}</h5>
+          <div className="visualizer-controls">
+            <Button variant="outline-danger" size="sm" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+        <div className="loading-message">
+          <p>No G85 data available for visualization</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Count defects from the map data
+  const defectCount = Array.from(mapData.dies.values()).filter(status => status === "EF").length;
+  const referenceCount = Array.from(mapData.dies.values()).filter(status => status === "FA").length;
+  const passCount = Array.from(mapData.dies.values()).filter(status => status === "01").length;
+  const nullCount = Array.from(mapData.dies.values()).filter(status => status === "FF").length;
+
+  return (
+    <div className="visualizer-container">
+      <div className="visualizer-header">
+        <h5>Wafer Map Visualization: {filename}</h5>
+        <div className="visualizer-controls">
+          <Button variant="outline-danger" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+      <div className="visualizer-info">
+        <p>Total Dies: {mapData.dies.size} | 
+           Pass: {passCount} | 
+           Defects: {defectCount} | 
+           Reference: {referenceCount} | 
+           Null: {nullCount}</p>
+        <p>Green: Pass (01) | Red: Defects (EF) | Blue: Reference (FA) | Gray: Null (FF) | Orange: Fail Code (FC)</p>
+      </div>
+      <div className="wafer-map-content">
+        {waferMapData ? (
+          <WaferMapVisualization mapData={waferMapData} />
+        ) : (
+          <div className="loading-message">
+            <p>Loading wafer map...</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [lots, setLots] = useState(mockLots);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showVisualizer, setShowVisualizer] = useState(false);
+  const [selectedLot, setSelectedLot] = useState(null);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [uploadForm, setUploadForm] = useState({ file: null, description: '' });
   const [alert, setAlert] = useState(null);
@@ -77,42 +181,46 @@ function App() {
       return;
     }
 
-    // Parse G85 file (simplified - in production you'd use papaparse or similar)
+    // Parse G85 file using the professional parser
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target.result;
-      const lines = content.split('\n');
-      const defects = [];
-      
-      // Simple G85 parsing (adjust based on your actual format)
-      lines.forEach((line, index) => {
-        if (line.trim() && line.includes(',')) {
-          const parts = line.split(',');
-          if (parts.length >= 3) {
+      try {
+        const content = event.target.result;
+        const mapData = parseG85(content);
+        
+        // Extract defect information for display
+        const defects = [];
+        for (const [coord, status] of mapData.dies) {
+          if (status === "EF") {
+            const [x, y] = coord.split(',').map(Number);
             defects.push({
-              x: parseFloat(parts[0]) || 0,
-              y: parseFloat(parts[1]) || 0,
-              defectType: parts[2]?.trim() || 'unknown',
-              severity: parts[3]?.trim() || 'minor'
+              x: x,
+              y: y,
+              defectType: 'defect',
+              severity: 'major'
             });
           }
         }
-      });
 
-      const newLot = {
-        id: Date.now(),
-        filename: file.name,
-        uploadedBy: currentUser.username,
-        uploadDate: new Date().toISOString().split('T')[0],
-        status: 'pending',
-        description: uploadForm.description,
-        defects: defects
-      };
+        const newLot = {
+          id: Date.now(),
+          filename: file.name,
+          uploadedBy: currentUser.username,
+          uploadDate: new Date().toISOString().split('T')[0],
+          status: 'pending',
+          description: uploadForm.description,
+          mapData: mapData,
+          defects: defects
+        };
 
-      setLots([...lots, newLot]);
-      setShowUploadModal(false);
-      setUploadForm({ file: null, description: '' });
-      setAlert({ type: 'success', message: 'Lot uploaded successfully!' });
+        setLots([...lots, newLot]);
+        setShowUploadModal(false);
+        setUploadForm({ file: null, description: '' });
+        setAlert({ type: 'success', message: 'G85 file uploaded and parsed successfully!' });
+      } catch (error) {
+        console.error('Error parsing G85 file:', error);
+        setAlert({ type: 'danger', message: 'Error parsing G85 file. Please ensure it\'s a valid G85 XML format.' });
+      }
     };
     reader.readAsText(file);
   };
@@ -122,6 +230,11 @@ function App() {
       lot.id === lotId ? { ...lot, status } : lot
     ));
     setAlert({ type: 'success', message: `Lot ${status} successfully!` });
+  };
+
+  const openVisualizer = (lot) => {
+    setSelectedLot(lot);
+    setShowVisualizer(true);
   };
 
   const Dashboard = () => (
@@ -157,6 +270,14 @@ function App() {
               <div className="card-body">
                 <p><strong>Uploaded by:</strong> {lot.uploadedBy}</p>
                 <p><strong>Date:</strong> {lot.uploadDate}</p>
+                {lot.mapData && (
+                  <>
+                    <p><strong>Product ID:</strong> {lot.mapData.header.ProductId || 'N/A'}</p>
+                    <p><strong>Lot ID:</strong> {lot.mapData.header.LotId || 'N/A'}</p>
+                    <p><strong>Wafer Size:</strong> {lot.mapData.header.WaferSize || 'N/A'}</p>
+                    <p><strong>Grid Size:</strong> {lot.mapData.header.Rows || 'N/A'} x {lot.mapData.header.Columns || 'N/A'}</p>
+                  </>
+                )}
                 <p><strong>Defects found:</strong> {lot.defects.length}</p>
                 {lot.description && (
                   <p><strong>Description:</strong> {lot.description}</p>
@@ -203,25 +324,36 @@ function App() {
                   </div>
                 )}
 
-                {currentUser?.role === 'admin' && lot.status === 'pending' && (
-                  <div className="mt-3">
-                    <Button 
-                      variant="success" 
-                      size="sm" 
-                      className="me-2"
-                      onClick={() => handleApproval(lot.id, 'approved')}
-                    >
-                      Approve
-                    </Button>
-                    <Button 
-                      variant="danger" 
-                      size="sm"
-                      onClick={() => handleApproval(lot.id, 'rejected')}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                )}
+                <div className="mt-3">
+                  <Button 
+                    variant="info" 
+                    size="sm" 
+                    className="me-2"
+                    onClick={() => openVisualizer(lot)}
+                  >
+                    View Wafer Map
+                  </Button>
+                  
+                  {currentUser?.role === 'admin' && lot.status === 'pending' && (
+                    <>
+                      <Button 
+                        variant="success" 
+                        size="sm" 
+                        className="me-2"
+                        onClick={() => handleApproval(lot.id, 'approved')}
+                      >
+                        Approve
+                      </Button>
+                      <Button 
+                        variant="danger" 
+                        size="sm"
+                        onClick={() => handleApproval(lot.id, 'rejected')}
+                      >
+                        Reject
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -325,7 +457,7 @@ function App() {
                   required
                 />
                 <Form.Text className="text-muted">
-                  Please select a G85 format file containing defect data.
+                  Please select a G85 XML format file containing wafer map data.
                 </Form.Text>
               </Form.Group>
               <Form.Group className="mb-3">
@@ -347,6 +479,24 @@ function App() {
                 </Button>
               </div>
             </Form>
+          </Modal.Body>
+        </Modal>
+
+        {/* Wafer Map Visualizer Modal */}
+        <Modal 
+          show={showVisualizer} 
+          onHide={() => setShowVisualizer(false)} 
+          size="xl"
+          dialogClassName="visualizer-modal"
+        >
+          <Modal.Body className="p-0">
+            {selectedLot && (
+              <WaferMapVisualizer
+                mapData={selectedLot.mapData}
+                filename={selectedLot.filename}
+                onClose={() => setShowVisualizer(false)}
+              />
+            )}
           </Modal.Body>
         </Modal>
       </div>
