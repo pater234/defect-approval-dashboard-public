@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Container, Navbar, Nav, Button, Modal, Form, Alert } from 'react-bootstrap';
 import WaferMapVisualization from './WaferMapVisualization';
-import { parseG85 } from './G85Parser';
+import { parseG85 } from './utils/g85Utils';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -44,30 +44,8 @@ const convertG85ToWaferMap = (mapData) => {
     return null;
   }
 
-  // Use the actual header data from the G85 file
-  const rows = parseInt(mapData.header.Rows);
-  const cols = parseInt(mapData.header.Columns);
-  
-  // Create dies map from the parsed G85 data
-  const dies = new Map();
-  
-  // Copy all dies from the parsed G85 data
-  for (const [coord, status] of mapData.dies) {
-    dies.set(coord, status);
-  }
-  
-  return {
-    header: {
-      Rows: rows,
-      Columns: cols,
-      LotID: mapData.header.LotId || 'Unknown',
-      WaferID: mapData.mapAttributes.SubstrateNumber || 'Unknown',
-      TestDate: mapData.header.CreateDate || new Date().toISOString().split('T')[0],
-      ProductId: mapData.header.ProductId || 'Unknown',
-      SupplierName: mapData.header.SupplierName || 'Unknown'
-    },
-    dies: dies
-  };
+  // The mapData is already in the correct format, just return it
+  return mapData;
 };
 
 // Wafer Map Visualizer Component
@@ -104,6 +82,7 @@ const WaferMapVisualizer = ({ mapData, filename, onClose }) => {
   const referenceCount = Array.from(mapData.dies.values()).filter(status => status === "FA").length;
   const passCount = Array.from(mapData.dies.values()).filter(status => status === "01").length;
   const nullCount = Array.from(mapData.dies.values()).filter(status => status === "FF").length;
+  const failCodeCount = Array.from(mapData.dies.values()).filter(status => status === "FC").length;
 
   return (
     <div className="visualizer-container">
@@ -120,7 +99,8 @@ const WaferMapVisualizer = ({ mapData, filename, onClose }) => {
            Pass: {passCount} | 
            Defects: {defectCount} | 
            Reference: {referenceCount} | 
-           Null: {nullCount}</p>
+           Null: {nullCount} | 
+           Fail Code: {failCodeCount}</p>
         <p>Green: Pass (01) | Red: Defects (EF) | Blue: Reference (FA) | Gray: Null (FF) | Orange: Fail Code (FC)</p>
       </div>
       <div className="wafer-map-content">

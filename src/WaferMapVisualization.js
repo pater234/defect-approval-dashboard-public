@@ -13,12 +13,6 @@ function WaferMapVisualization({ mapData }) {
     binCounts.set(status, (binCounts.get(status) || 0) + 1);
   }
 
-  // Wafer circle parameters
-  const centerX = (cols - 1) / 2;
-  const centerY = (rows - 1) / 2;
-  // Use 0.95 to leave a small margin and ensure circular shape
-  const radius = Math.min(centerX, centerY) * 0.95;
-
   // Create grid for visualization
   const grid = [];
   for (let y = 0; y < rows; y++) {
@@ -26,18 +20,7 @@ function WaferMapVisualization({ mapData }) {
     for (let x = 0; x < cols; x++) {
       const coord = `${x},${y}`;
       const status = mapData.dies.get(coord) || "FF";
-      // Calculate distance from center
-      const dx = x - centerX;
-      const dy = y - centerY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      // Only show dies within the wafer circle
-      const inWafer = dist <= radius;
-      row.push({
-        status,
-        inWafer,
-        x,
-        y
-      });
+      row.push(status);
     }
     grid.push(row);
   }
@@ -54,27 +37,15 @@ function WaferMapVisualization({ mapData }) {
   return (
     <div className="wafer-map-visualization">
       <div className="map-container">
-        <div className="grid" style={{ 
-          width: `${Math.min(cols * 20, 600)}px`, 
-          height: `${Math.min(rows * 20, 600)}px` 
-        }}>
+        <div className="grid">
           {grid.map((row, y) => (
-            <div key={y} className="row" style={{ 
-              width: '100%',
-              justifyContent: 'center'
-            }}>
-              {row.map((cell, x) => (
+            <div key={y} className="row">
+              {row.map((status, x) => (
                 <div
                   key={`${x}-${y}`}
                   className="cell"
-                  style={{
-                    backgroundColor: cell.inWafer ? (binColors[cell.status] || "#9E9E9E") : "transparent",
-                    opacity: cell.inWafer ? 1 : 0.1,
-                    border: cell.inWafer ? '1px solid #ddd' : 'none',
-                    pointerEvents: cell.inWafer ? 'auto' : 'none',
-                    display: cell.inWafer ? 'block' : 'none'
-                  }}
-                  title={cell.inWafer ? `Position: (${x},${y}), Status: ${cell.status} - ${cell.status === "01" ? "Pass" : cell.status === "EF" ? "Defect" : cell.status === "FA" ? "Reference" : cell.status === "FF" ? "Null" : cell.status === "FC" ? "Fail Code" : "Unknown"}` : ''}
+                  style={{ backgroundColor: binColors[status] || "#9E9E9E" }}
+                  title={`Position: (${x},${y}), Status: ${status} - ${status === "01" ? "Pass" : status === "EF" ? "Defect" : status === "FA" ? "Reference" : status === "FF" ? "Null" : status === "FC" ? "Fail Code" : "Unknown"}`}
                 />
               ))}
             </div>
