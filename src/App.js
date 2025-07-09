@@ -153,7 +153,7 @@ function App() {
     <Container className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>CPE Defect Approval Dashboard</h2>
-        {currentUser?.role === 'user' && (
+        {(currentUser?.role === 'user' || currentUser?.role === 'admin') && (
           <Button variant="primary" onClick={() => setShowUploadModal(true)}>
             Upload New Lot
           </Button>
