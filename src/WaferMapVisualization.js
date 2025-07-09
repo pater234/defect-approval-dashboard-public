@@ -2,32 +2,16 @@ import React from 'react';
 import './WaferMapVisualization.css';
 
 function WaferMapVisualization({ mapData }) {
-  if (!mapData) return null;
+  if (!mapData || !mapData.header || !mapData.dies) {
+    return (
+      <div className="wafer-map-visualization">
+        <div className="no-data">No wafer map data available</div>
+      </div>
+    );
+  }
 
   const rows = parseInt(mapData.header.Rows);
   const cols = parseInt(mapData.header.Columns);
-  const binCounts = new Map();
-
-  console.log('WaferMapVisualization render:', { rows, cols, mapData });
-
-  // Count bins
-  for (const [_, status] of mapData.dies) {
-    binCounts.set(status, (binCounts.get(status) || 0) + 1);
-  }
-
-  // Create grid for visualization
-  const grid = [];
-  for (let y = 0; y < rows; y++) {
-    const row = [];
-    for (let x = 0; x < cols; x++) {
-      const coord = `${x},${y}`;
-      const status = mapData.dies.get(coord) || "FF";
-      row.push(status);
-    }
-    grid.push(row);
-  }
-  
-  console.log('Grid created:', { rows, cols, gridLength: grid.length, firstRowLength: grid[0]?.length, sampleRow: grid[0]?.slice(0, 10) });
 
   // Bin color mapping
   const binColors = {
@@ -38,64 +22,99 @@ function WaferMapVisualization({ mapData }) {
     "FC": "#FF9800", // Fail Code - Orange
   };
 
-  console.log('Rendering grid with', grid.length, 'rows');
-  
+  // Count bins for statistics
+  const binCounts = new Map();
+  for (const [_, status] of mapData.dies) {
+    binCounts.set(status, (binCounts.get(status) || 0) + 1);
+  }
+
+  // Create the wafer map grid
+  const createWaferMap = () => {
+    const grid = [];
+    
+    for (let y = 0; y < rows; y++) {
+      const row = [];
+      for (let x = 0; x < cols; x++) {
+        const coord = `${x},${y}`;
+        const status = mapData.dies.get(coord) || "FF";
+        row.push({ x, y, status });
+      }
+      grid.push(row);
+    }
+    
+    return grid;
+  };
+
+  const waferGrid = createWaferMap();
+
   return (
     <div className="wafer-map-visualization">
-      <div className="map-container">
-        {grid.length > 0 ? (
-          <div className="grid" style={{ border: '2px solid red' }}>
-            {grid.slice(0, 10).map((row, y) => (
-              <div key={y} className="row" style={{ border: '1px solid blue' }}>
-                {row.slice(0, 10).map((status, x) => (
-                  <div
-                    key={`${x}-${y}`}
-                    className="cell"
-                    style={{ 
-                      backgroundColor: binColors[status] || "#9E9E9E",
-                      border: '1px solid #999'
-                    }}
-                    title={`Position: (${x},${y}), Status: ${status} - ${status === "01" ? "Pass" : status === "EF" ? "Defect" : status === "FA" ? "Reference" : status === "FF" ? "Null" : status === "FC" ? "Fail Code" : "Unknown"}`}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-            <p>No grid data available for visualization</p>
-            <p>Rows: {rows}, Columns: {cols}</p>
-          </div>
-        )}
+      <div className="wafer-header">
+        <h3>Wafer Map Visualization</h3>
+        <div className="wafer-info">
+          <span>Grid: {rows} × {cols}</span>
+          <span>Total Dies: {mapData.dies.size}</span>
+        </div>
       </div>
-      <div className="bin-stats">
-        <h3>Bin Statistics</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Bin Code</th>
-              <th>Description</th>
-              <th>Count</th>
-              <th>Percentage</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from(binCounts.entries()).map(([code, count]) => (
-              <tr key={code}>
-                <td>{code}</td>
-                <td>
-                  {code === "01" ? "Pass Die" :
-                   code === "EF" ? "Defect" :
-                   code === "FA" ? "Reference Device" :
-                   code === "FF" ? "Null" :
-                   code === "FC" ? "Fail Code" : "Unknown"}
-                </td>
-                <td>{count}</td>
-                <td>{((count / (rows * cols)) * 100).toFixed(2)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      
+      <div className="wafer-container">
+        <div className="wafer-grid">
+          {waferGrid.map((row, y) => (
+            <div key={y} className="wafer-row">
+              {row.map(({ x, y, status }) => (
+                <div
+                  key={`${x}-${y}`}
+                  className="wafer-cell"
+                  style={{ 
+                    backgroundColor: binColors[status] || "#9E9E9E",
+                    width: '8px',
+                    height: '8px'
+                  }}
+                  title={`(${x},${y}) - ${status}`}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="wafer-legend">
+        <div className="legend-item">
+          <div className="legend-color" style={{ backgroundColor: binColors["01"] }}></div>
+          <span>Pass (01)</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-color" style={{ backgroundColor: binColors["EF"] }}></div>
+          <span>Defect (EF)</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-color" style={{ backgroundColor: binColors["FA"] }}></div>
+          <span>Reference (FA)</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-color" style={{ backgroundColor: binColors["FF"] }}></div>
+          <span>Null (FF)</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-color" style={{ backgroundColor: binColors["FC"] }}></div>
+          <span>Fail Code (FC)</span>
+        </div>
+      </div>
+
+      <div className="wafer-stats">
+        <h4>Die Statistics</h4>
+        <div className="stats-grid">
+          {Array.from(binCounts.entries()).map(([code, count]) => (
+            <div key={code} className="stat-item">
+              <div className="stat-color" style={{ backgroundColor: binColors[code] || "#9E9E9E" }}></div>
+              <div className="stat-info">
+                <div className="stat-code">{code}</div>
+                <div className="stat-count">{count} dies</div>
+                <div className="stat-percent">{((count / (rows * cols)) * 100).toFixed(1)}%</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

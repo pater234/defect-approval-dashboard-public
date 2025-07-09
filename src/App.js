@@ -48,80 +48,13 @@ const convertG85ToWaferMap = (mapData) => {
   return mapData;
 };
 
-// Wafer Map Visualizer Component
-const WaferMapVisualizer = ({ mapData, filename, onClose }) => {
-  const [waferMapData, setWaferMapData] = useState(null);
 
-  useEffect(() => {
-    if (mapData) {
-      const waferData = convertG85ToWaferMap(mapData);
-      setWaferMapData(waferData);
-    }
-  }, [mapData]);
-
-  if (!mapData) {
-    return (
-      <div className="visualizer-container">
-        <div className="visualizer-header">
-          <h5>Wafer Map Visualization: {filename}</h5>
-          <div className="visualizer-controls">
-            <Button variant="outline-danger" size="sm" onClick={onClose}>
-              Close
-            </Button>
-          </div>
-        </div>
-        <div className="loading-message">
-          <p>No G85 data available for visualization</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Count defects from the map data
-  const defectCount = Array.from(mapData.dies.values()).filter(status => status === "EF").length;
-  const referenceCount = Array.from(mapData.dies.values()).filter(status => status === "FA").length;
-  const passCount = Array.from(mapData.dies.values()).filter(status => status === "01").length;
-  const nullCount = Array.from(mapData.dies.values()).filter(status => status === "FF").length;
-  const failCodeCount = Array.from(mapData.dies.values()).filter(status => status === "FC").length;
-
-  return (
-    <div className="visualizer-container">
-      <div className="visualizer-header">
-        <h5>Wafer Map Visualization: {filename}</h5>
-        <div className="visualizer-controls">
-          <Button variant="outline-danger" size="sm" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      </div>
-      <div className="visualizer-info">
-        <p>Total Dies: {mapData.dies.size} | 
-           Pass: {passCount} | 
-           Defects: {defectCount} | 
-           Reference: {referenceCount} | 
-           Null: {nullCount} | 
-           Fail Code: {failCodeCount}</p>
-        <p>Green: Pass (01) | Red: Defects (EF) | Blue: Reference (FA) | Gray: Null (FF) | Orange: Fail Code (FC)</p>
-      </div>
-      <div className="wafer-map-content">
-        {waferMapData ? (
-          <WaferMapVisualization mapData={waferMapData} />
-        ) : (
-          <div className="loading-message">
-            <p>Loading wafer map...</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [lots, setLots] = useState(mockLots);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showVisualizer, setShowVisualizer] = useState(false);
   const [selectedLot, setSelectedLot] = useState(null);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [uploadForm, setUploadForm] = useState({ file: null, description: '' });
@@ -214,7 +147,6 @@ function App() {
 
   const openVisualizer = (lot) => {
     setSelectedLot(lot);
-    setShowVisualizer(true);
   };
 
   const Dashboard = () => (
@@ -339,6 +271,19 @@ function App() {
           </div>
         ))}
       </div>
+
+      {/* Wafer Map Visualization Section */}
+      {selectedLot && selectedLot.mapData && (
+        <div className="mt-4">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h3>Wafer Map: {selectedLot.filename}</h3>
+            <Button variant="outline-secondary" size="sm" onClick={() => setSelectedLot(null)}>
+              Close Map
+            </Button>
+          </div>
+          <WaferMapVisualization mapData={selectedLot.mapData} />
+        </div>
+      )}
     </Container>
   );
 
@@ -462,23 +407,7 @@ function App() {
           </Modal.Body>
         </Modal>
 
-        {/* Wafer Map Visualizer Modal */}
-        <Modal 
-          show={showVisualizer} 
-          onHide={() => setShowVisualizer(false)} 
-          size="xl"
-          dialogClassName="visualizer-modal"
-        >
-          <Modal.Body className="p-0">
-            {selectedLot && (
-              <WaferMapVisualizer
-                mapData={selectedLot.mapData}
-                filename={selectedLot.filename}
-                onClose={() => setShowVisualizer(false)}
-              />
-            )}
-          </Modal.Body>
-        </Modal>
+
       </div>
     </Router>
   );
