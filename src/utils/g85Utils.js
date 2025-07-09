@@ -454,7 +454,7 @@ function findTestDieAreas(mapData) {
           // Check right border
           if (startX + width < cols && isSurroundedByPass) {
             for (let y = startY; y < startY + height; y++) {
-              const coord = `${x + width},${y}`;
+              const coord = `${startX + width},${y}`;
               if (mapData.dies.get(coord) !== "01") {
                 isSurroundedByPass = false;
                 break;
