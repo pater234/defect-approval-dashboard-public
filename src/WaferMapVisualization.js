@@ -27,7 +27,7 @@ function WaferMapVisualization({ mapData }) {
     grid.push(row);
   }
   
-  console.log('Grid created:', { rows, cols, gridLength: grid.length, firstRowLength: grid[0]?.length });
+  console.log('Grid created:', { rows, cols, gridLength: grid.length, firstRowLength: grid[0]?.length, sampleRow: grid[0]?.slice(0, 10) });
 
   // Bin color mapping
   const binColors = {
@@ -38,18 +38,23 @@ function WaferMapVisualization({ mapData }) {
     "FC": "#FF9800", // Fail Code - Orange
   };
 
+  console.log('Rendering grid with', grid.length, 'rows');
+  
   return (
     <div className="wafer-map-visualization">
       <div className="map-container">
         {grid.length > 0 ? (
-          <div className="grid">
-            {grid.map((row, y) => (
-              <div key={y} className="row">
-                {row.map((status, x) => (
+          <div className="grid" style={{ border: '2px solid red' }}>
+            {grid.slice(0, 10).map((row, y) => (
+              <div key={y} className="row" style={{ border: '1px solid blue' }}>
+                {row.slice(0, 10).map((status, x) => (
                   <div
                     key={`${x}-${y}`}
                     className="cell"
-                    style={{ backgroundColor: binColors[status] || "#9E9E9E" }}
+                    style={{ 
+                      backgroundColor: binColors[status] || "#9E9E9E",
+                      border: '1px solid #999'
+                    }}
                     title={`Position: (${x},${y}), Status: ${status} - ${status === "01" ? "Pass" : status === "EF" ? "Defect" : status === "FA" ? "Reference" : status === "FF" ? "Null" : status === "FC" ? "Fail Code" : "Unknown"}`}
                   />
                 ))}
