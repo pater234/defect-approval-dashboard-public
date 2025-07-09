@@ -59,6 +59,7 @@ function App() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [uploadForm, setUploadForm] = useState({ file: null, description: '' });
   const [alert, setAlert] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -149,6 +150,11 @@ function App() {
     setSelectedLot(lot);
   };
 
+  // Filter lots based on status
+  const filteredLots = statusFilter === 'all' 
+    ? lots 
+    : lots.filter(lot => lot.status === statusFilter);
+
   const Dashboard = () => (
     <Container className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -166,8 +172,45 @@ function App() {
         </Alert>
       )}
 
+      {/* Status Filter */}
+      <div className="mb-4">
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted">Filter by status:</span>
+          <div className="btn-group" role="group">
+            <Button
+              variant={statusFilter === 'all' ? 'primary' : 'outline-secondary'}
+              size="sm"
+              onClick={() => setStatusFilter('all')}
+            >
+              All ({lots.length})
+            </Button>
+            <Button
+              variant={statusFilter === 'pending' ? 'warning' : 'outline-warning'}
+              size="sm"
+              onClick={() => setStatusFilter('pending')}
+            >
+              Pending ({lots.filter(lot => lot.status === 'pending').length})
+            </Button>
+            <Button
+              variant={statusFilter === 'approved' ? 'success' : 'outline-success'}
+              size="sm"
+              onClick={() => setStatusFilter('approved')}
+            >
+              Approved ({lots.filter(lot => lot.status === 'approved').length})
+            </Button>
+            <Button
+              variant={statusFilter === 'rejected' ? 'danger' : 'outline-danger'}
+              size="sm"
+              onClick={() => setStatusFilter('rejected')}
+            >
+              Rejected ({lots.filter(lot => lot.status === 'rejected').length})
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <div className="row">
-        {lots.map(lot => (
+        {filteredLots.map(lot => (
           <div key={lot.id} className="col-md-6 col-lg-4 mb-4">
             <div className="card">
               <div className="card-header d-flex justify-content-between align-items-center">
