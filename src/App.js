@@ -49,7 +49,7 @@ const convertG85ToWaferMap = (mapData) => {
   return mapData;
 };
 
-
+const ADMIN_SECRET = 'YOUR_ADMIN_SECRET_HERE'; // <-- Set your admin secret here
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -68,6 +68,9 @@ function App() {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [registerForm, setRegisterForm] = useState({ email: '', password: '', adminSecret: '' });
+  const [registerMessage, setRegisterMessage] = useState('');
 
   // Handle login
   const handleLogin = async (e) => {
@@ -80,6 +83,7 @@ function App() {
     } else {
       setUser(data.user);
       fetchFiles();
+      fetchUserRole(data.user.email);
     }
     setLoading(false);
   };
@@ -120,6 +124,7 @@ function App() {
       if (data.session) {
         setUser(data.session.user);
         fetchFiles();
+        fetchUserRole(data.session.user.email);
       }
     });
   }, []);
@@ -379,6 +384,91 @@ function App() {
       )}
     </Container>
   );
+
+  // Registration handler
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setRegisterMessage('');
+    // Register with Supabase Auth
+    const { data, error } = await supabase.auth.signUp({
+      email: registerForm.email,
+      password: registerForm.password
+    });
+    if (error) {
+      setRegisterMessage(error.message);
+      setLoading(false);
+      return;
+    }
+    // Set role in user_roles table
+    const role = registerForm.adminSecret === ADMIN_SECRET ? 'admin' : 'user';
+    await supabase.from('user_roles').upsert([
+      { email: registerForm.email, role }
+    ]);
+    setRegisterMessage('Registration successful! Please check your email to confirm your account.');
+    setLoading(false);
+  };
+
+  // Fetch user role after login
+  const fetchUserRole = async (email) => {
+    const { data, error } = await supabase.from('user_roles').select('role').eq('email', email).single();
+    if (!error && data) {
+      setUser({ ...user, role: data.role });
+    }
+  };
+
+  if (!user) {
+    return (
+      <div style={{ maxWidth: 400, margin: 'auto', padding: 20 }}>
+        <h2>Login</h2>
+        <form onSubmit={handleLogin}>
+          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required /><br />
+          <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required /><br />
+          <button type="submit" disabled={loading}>Login</button>
+        </form>
+        <Button variant="link" onClick={() => setShowRegisterModal(true)}>Register</Button>
+        {message && <p>{message}</p>}
+        <Modal show={showRegisterModal} onHide={() => setShowRegisterModal(false)}>
+          <Modal.Header closeButton>
+            <Modal.Title>Register</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form onSubmit={handleRegister}>
+              <Form.Group className="mb-3">
+                <Form.Label>Email</Form.Label>
+                <Form.Control
+                  type="email"
+                  value={registerForm.email}
+                  onChange={e => setRegisterForm({ ...registerForm, email: e.target.value })}
+                  required
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Password</Form.Label>
+                <Form.Control
+                  type="password"
+                  value={registerForm.password}
+                  onChange={e => setRegisterForm({ ...registerForm, password: e.target.value })}
+                  required
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Admin Secret (optional)</Form.Label>
+                <Form.Control
+                  type="text"
+                  value={registerForm.adminSecret}
+                  onChange={e => setRegisterForm({ ...registerForm, adminSecret: e.target.value })}
+                  placeholder="Enter admin secret if you have one"
+                />
+              </Form.Group>
+              <Button type="submit" disabled={loading}>Register</Button>
+            </Form>
+            {registerMessage && <Alert variant={registerMessage.includes('successful') ? 'success' : 'danger'} className="mt-3">{registerMessage}</Alert>}
+          </Modal.Body>
+        </Modal>
+      </div>
+    );
+  }
 
   return (
     <Router>
