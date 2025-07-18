@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Container, Navbar, Nav, Button, Modal, Form, Alert } from 'react-bootstrap';
 import WaferMapVisualization from './WaferMapVisualization';
 import { parseG85 } from './utils/g85Utils';
+import { supabase } from './utils/supabaseClient';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -60,22 +61,68 @@ function App() {
   const [uploadForm, setUploadForm] = useState({ file: null, description: '' });
   const [alert, setAlert] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [user, setUser] = useState(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
-  const handleLogin = (e) => {
+  // Handle login
+  const handleLogin = async (e) => {
     e.preventDefault();
-    const user = mockUsers.find(u => 
-      u.username === loginForm.username && u.password === loginForm.password
-    );
-    
-    if (user) {
-      setCurrentUser(user);
-      setShowLoginModal(false);
-      setLoginForm({ username: '', password: '' });
-      setAlert({ type: 'success', message: 'Login successful!' });
+    setLoading(true);
+    setMessage('');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setMessage(error.message);
     } else {
-      setAlert({ type: 'danger', message: 'Invalid credentials!' });
+      setUser(data.user);
+      fetchFiles();
     }
+    setLoading(false);
   };
+
+  // Handle file upload
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!file) return;
+    setLoading(true);
+    setMessage('');
+    const fileName = `${Date.now()}_${file.name}`;
+    const { data, error } = await supabase.storage.from('uploads').upload(fileName, file);
+    if (error) {
+      setMessage(error.message);
+    } else {
+      // Optionally, insert metadata into a table
+      await supabase.from('file_metadata').insert([
+        { filename: fileName, original_name: file.name, uploaded_by: user.email, status: 'pending' }
+      ]);
+      setMessage('File uploaded!');
+      fetchFiles();
+    }
+    setLoading(false);
+  };
+
+  // Fetch files from Supabase table
+  const fetchFiles = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('file_metadata').select('*').order('uploaded_at', { ascending: false });
+    if (!error) setFiles(data);
+    setLoading(false);
+  };
+
+  // On mount, check for session
+  useEffect(() => {
+    const session = supabase.auth.getSession();
+    session.then(({ data }) => {
+      if (data.session) {
+        setUser(data.session.user);
+        fetchFiles();
+      }
+    });
+  }, []);
 
   const handleLogout = () => {
     setCurrentUser(null);
@@ -139,10 +186,11 @@ function App() {
     reader.readAsText(file);
   };
 
-  const handleApproval = (lotId, status) => {
-    setLots(lots.map(lot => 
-      lot.id === lotId ? { ...lot, status } : lot
-    ));
+  const handleApproval = async (lotId, status) => {
+    // Update in Supabase
+    await supabase.from('file_metadata').update({ status }).eq('id', lotId);
+    // Refresh the list
+    fetchFiles();
     setAlert({ type: 'success', message: `Lot ${status} successfully!` });
   };
 
