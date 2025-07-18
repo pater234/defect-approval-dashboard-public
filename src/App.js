@@ -6,6 +6,8 @@ import { parseG85 } from './utils/g85Utils';
 import { supabase } from './utils/supabaseClient';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 // Mock data storage (in production, this would be a database)
 const mockUsers = [
@@ -49,7 +51,10 @@ const convertG85ToWaferMap = (mapData) => {
   return mapData;
 };
 
-const ADMIN_SECRET = 'YOUR_ADMIN_SECRET_HERE'; // <-- Set your admin secret here
+const ADMIN_SECRET = 'admin123'; // <-- Set your admin secret here
+
+// JWT secret for signing tokens (in production, keep this secret and secure)
+const JWT_SECRET = 'secret1213';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -72,19 +77,59 @@ function App() {
   const [registerForm, setRegisterForm] = useState({ email: '', password: '', adminSecret: '' });
   const [registerMessage, setRegisterMessage] = useState('');
 
-  // Handle login
+  // Registration handler (local auth)
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setRegisterMessage('');
+    // Check if user already exists
+    const { data: existing, error: existingError } = await supabase.from('users').select('email').eq('email', registerForm.email).single();
+    if (existing && existing.email) {
+      setRegisterMessage('User already exists.');
+      setLoading(false);
+      return;
+    }
+    // Hash password
+    const hashedPassword = await bcrypt.hash(registerForm.password, 10);
+    // Set role
+    const role = registerForm.adminSecret === ADMIN_SECRET ? 'admin' : 'user';
+    // Insert user
+    const { error } = await supabase.from('users').insert([
+      { email: registerForm.email, password: hashedPassword, role }
+    ]);
+    if (error) {
+      setRegisterMessage(error.message);
+      setLoading(false);
+      return;
+    }
+    setRegisterMessage('Registration successful! You can now log in.');
+    setLoading(false);
+  };
+
+  // Login handler (local auth)
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setUser(data.user);
-      fetchFiles();
-      fetchUserRole(data.user.email);
+    // Fetch user
+    const { data: userData, error } = await supabase.from('users').select('*').eq('email', email).single();
+    if (error || !userData) {
+      setMessage('Invalid email or password.');
+      setLoading(false);
+      return;
     }
+    // Check password
+    const isMatch = await bcrypt.compare(password, userData.password);
+    if (!isMatch) {
+      setMessage('Invalid email or password.');
+      setLoading(false);
+      return;
+    }
+    // Create JWT and store in localStorage
+    const token = jwt.sign({ email: userData.email, role: userData.role }, JWT_SECRET, { expiresIn: '24h' });
+    localStorage.setItem('token', token);
+    setUser({ email: userData.email, role: userData.role });
+    fetchFiles();
     setLoading(false);
   };
 
@@ -117,21 +162,24 @@ function App() {
     setLoading(false);
   };
 
-  // On mount, check for session
+  // On mount, check for token
   useEffect(() => {
-    const session = supabase.auth.getSession();
-    session.then(({ data }) => {
-      if (data.session) {
-        setUser(data.session.user);
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        setUser({ email: decoded.email, role: decoded.role });
         fetchFiles();
-        fetchUserRole(data.session.user.email);
+      } catch (e) {
+        localStorage.removeItem('token');
       }
-    });
+    }
   }, []);
 
+  // Logout
   const handleLogout = () => {
-    setCurrentUser(null);
-    setAlert({ type: 'info', message: 'Logged out successfully!' });
+    localStorage.removeItem('token');
+    setUser(null);
   };
 
   const handleFileUpload = (e) => {
@@ -171,7 +219,7 @@ function App() {
         const newLot = {
           id: Date.now(),
           filename: file.name,
-          uploadedBy: currentUser.username,
+          uploadedBy: user.email,
           uploadDate: new Date().toISOString().split('T')[0],
           status: 'pending',
           description: uploadForm.description,
@@ -385,38 +433,6 @@ function App() {
     </Container>
   );
 
-  // Registration handler
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setRegisterMessage('');
-    // Register with Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
-      email: registerForm.email,
-      password: registerForm.password
-    });
-    if (error) {
-      setRegisterMessage(error.message);
-      setLoading(false);
-      return;
-    }
-    // Set role in user_roles table
-    const role = registerForm.adminSecret === ADMIN_SECRET ? 'admin' : 'user';
-    await supabase.from('user_roles').upsert([
-      { email: registerForm.email, role }
-    ]);
-    setRegisterMessage('Registration successful! Please check your email to confirm your account.');
-    setLoading(false);
-  };
-
-  // Fetch user role after login
-  const fetchUserRole = async (email) => {
-    const { data, error } = await supabase.from('user_roles').select('role').eq('email', email).single();
-    if (!error && data) {
-      setUser({ ...user, role: data.role });
-    }
-  };
-
   if (!user) {
     return (
       <div style={{ maxWidth: 400, margin: 'auto', padding: 20 }}>
@@ -485,7 +501,7 @@ function App() {
                 {currentUser ? (
                   <>
                     <Navbar.Text className="me-3">
-                      Welcome, {currentUser.username} ({currentUser.role})
+                      Welcome, {currentUser.email} ({currentUser.role})
                     </Navbar.Text>
                     <Button variant="outline-light" onClick={handleLogout}>
                       Logout
@@ -520,11 +536,11 @@ function App() {
           <Modal.Body>
             <Form onSubmit={handleLogin}>
               <Form.Group className="mb-3">
-                <Form.Label>Username</Form.Label>
+                <Form.Label>Email</Form.Label>
                 <Form.Control
-                  type="text"
-                  value={loginForm.username}
-                  onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
                   required
                 />
               </Form.Group>
@@ -532,8 +548,8 @@ function App() {
                 <Form.Label>Password</Form.Label>
                 <Form.Control
                   type="password"
-                  value={loginForm.password}
-                  onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
                   required
                 />
               </Form.Group>
