@@ -6,7 +6,7 @@ import { parseG85 } from './utils/g85Utils';
 import { supabase } from './utils/supabaseClient';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
-import bcrypt from 'bcryptjs';
+import CryptoJS from 'crypto-js';
 import jwt from 'jsonwebtoken';
 
 // Mock data storage (in production, this would be a database)
@@ -89,8 +89,8 @@ function App() {
       setLoading(false);
       return;
     }
-    // Hash password
-    const hashedPassword = await bcrypt.hash(registerForm.password, 10);
+    // Hash password with SHA256
+    const hashedPassword = CryptoJS.SHA256(registerForm.password).toString();
     // Set role
     const role = registerForm.adminSecret === ADMIN_SECRET ? 'admin' : 'user';
     // Insert user
@@ -118,9 +118,9 @@ function App() {
       setLoading(false);
       return;
     }
-    // Check password
-    const isMatch = await bcrypt.compare(password, userData.password);
-    if (!isMatch) {
+    // Check password with SHA256
+    const hashedInput = CryptoJS.SHA256(password).toString();
+    if (hashedInput !== userData.password) {
       setMessage('Invalid email or password.');
       setLoading(false);
       return;
