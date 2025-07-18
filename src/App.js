@@ -7,7 +7,8 @@ import { supabase } from './utils/supabaseClient';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import CryptoJS from 'crypto-js';
-import jwt from 'jsonwebtoken';
+import { SignJWT, jwtVerify } from 'jose';
+import jwt_decode from 'jwt-decode';
 
 // Mock data storage (in production, this would be a database)
 const mockUsers = [
@@ -55,6 +56,26 @@ const ADMIN_SECRET = 'admin123'; // <-- Set your admin secret here
 
 // JWT secret for signing tokens (in production, keep this secret and secure)
 const JWT_SECRET = 'secret1213';
+
+// Helper to create JWT in browser
+async function createJWT(payload, secret) {
+  const encoder = new TextEncoder();
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setExpirationTime('24h')
+    .sign(encoder.encode(secret));
+}
+
+// Helper to verify JWT in browser
+async function verifyJWT(token, secret) {
+  const encoder = new TextEncoder();
+  try {
+    const { payload } = await jwtVerify(token, encoder.encode(secret));
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -126,7 +147,7 @@ function App() {
       return;
     }
     // Create JWT and store in localStorage
-    const token = jwt.sign({ email: userData.email, role: userData.role }, JWT_SECRET, { expiresIn: '24h' });
+    const token = await createJWT({ email: userData.email, role: userData.role }, JWT_SECRET);
     localStorage.setItem('token', token);
     setUser({ email: userData.email, role: userData.role });
     fetchFiles();
@@ -166,13 +187,14 @@ function App() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        setUser({ email: decoded.email, role: decoded.role });
-        fetchFiles();
-      } catch (e) {
-        localStorage.removeItem('token');
-      }
+      verifyJWT(token, JWT_SECRET).then(decoded => {
+        if (decoded) {
+          setUser({ email: decoded.email, role: decoded.role });
+          fetchFiles();
+        } else {
+          localStorage.removeItem('token');
+        }
+      });
     }
   }, []);
 
