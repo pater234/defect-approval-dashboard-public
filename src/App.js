@@ -78,7 +78,7 @@ async function verifyJWT(token, secret) {
 }
 
 function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [user, setUser] = useState(null);
   const [lots, setLots] = useState(mockLots);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -87,7 +87,6 @@ function App() {
   const [uploadForm, setUploadForm] = useState({ file: null, description: '' });
   const [alert, setAlert] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [user, setUser] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [file, setFile] = useState(null);
@@ -282,7 +281,7 @@ function App() {
     <Container className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>CPE Defect Approval Dashboard</h2>
-        {(currentUser?.role === 'user' || currentUser?.role === 'admin') && (
+        {(user?.role === 'user' || user?.role === 'admin') && (
           <Button variant="primary" onClick={() => setShowUploadModal(true)}>
             Upload New Lot
           </Button>
@@ -414,7 +413,7 @@ function App() {
                     View Wafer Map
                   </Button>
                   
-                  {currentUser?.role === 'admin' && lot.status === 'pending' && (
+                  {user?.role === 'admin' && lot.status === 'pending' && (
                     <>
                       <Button 
                         variant="success" 
@@ -520,10 +519,10 @@ function App() {
                 <Nav.Link href="#home">Dashboard</Nav.Link>
               </Nav>
               <Nav>
-                {currentUser ? (
+                {user ? (
                   <>
                     <Navbar.Text className="me-3">
-                      Welcome, {currentUser.email} ({currentUser.role})
+                      Welcome, {user.email} ({user.role})
                     </Navbar.Text>
                     <Button variant="outline-light" onClick={handleLogout}>
                       Logout
@@ -542,11 +541,11 @@ function App() {
         <Routes>
           <Route 
             path="/" 
-            element={currentUser ? <Dashboard /> : <Navigate to="/login" />} 
+            element={user ? <Dashboard /> : <Navigate to="/login" />} 
           />
           <Route 
             path="/login" 
-            element={currentUser ? <Navigate to="/" /> : <Dashboard />} 
+            element={user ? <Navigate to="/" /> : <Dashboard />} 
           />
         </Routes>
 
