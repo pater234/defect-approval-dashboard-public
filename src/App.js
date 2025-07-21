@@ -161,8 +161,10 @@ function App() {
     setLoading(true);
     setMessage('');
     const fileName = `${Date.now()}_${file.name}`;
-    const { data, error } = await supabase.storage.from('uploads').upload(fileName, file);
+    console.log('Uploading file:', file, file instanceof File, file.size);
+    const { data, error } = await supabase.storage.from('uploads').upload(fileName, file, { upsert: true });
     if (error) {
+      console.error('Supabase upload error:', error);
       setMessage(error.message);
     } else {
       await supabase.from('file_metadata').insert([
