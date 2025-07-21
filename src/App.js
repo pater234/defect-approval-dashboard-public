@@ -588,7 +588,6 @@ function App() {
                 <Form.Label>G85 File</Form.Label>
                 <Form.Control
                   type="file"
-                  accept=".g85"
                   onChange={e => setFile(e.target.files[0])}
                   required
                 />
