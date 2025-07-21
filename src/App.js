@@ -251,8 +251,16 @@ function App() {
     setAlert({ type: 'success', message: `Lot ${status} successfully!` });
   };
 
-  const openVisualizer = (lot) => {
-    setSelectedLot(lot);
+  const openVisualizer = async (file) => {
+    // Get the public URL for the file
+    const publicUrl = supabase.storage.from('uploads').getPublicUrl(file.filename).data.publicUrl;
+    // Fetch the file contents
+    const response = await fetch(publicUrl);
+    const g85Text = await response.text();
+    // Parse the G85 file
+    const mapData = parseG85(g85Text);
+    // Set the selected lot with parsed mapData
+    setSelectedLot({ ...file, mapData });
   };
 
   // Filter lots based on status
