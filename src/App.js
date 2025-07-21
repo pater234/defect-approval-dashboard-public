@@ -302,12 +302,12 @@ function App() {
                     <p><strong>Grid Size:</strong> {file.mapData.header.Rows || 'N/A'} x {file.mapData.header.Columns || 'N/A'}</p>
                   </>
                 )}
-                <p><strong>Defects found:</strong> {file.defects.length}</p>
+                <p><strong>Defects found:</strong> {(file.defects ? file.defects.length : 0)}</p>
                 {file.description && (
                   <p><strong>Description:</strong> {file.description}</p>
                 )}
                 
-                {file.defects.length > 0 && (
+                {(file.defects && file.defects.length > 0) && (
                   <div className="mt-3">
                     <h6>Defects:</h6>
                     <div className="table-responsive">
@@ -321,7 +321,7 @@ function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {file.defects.slice(0, 3).map((defect, index) => (
+                          {(file.defects || []).slice(0, 3).map((defect, index) => (
                             <tr key={index}>
                               <td>{defect.x}</td>
                               <td>{defect.y}</td>
@@ -335,7 +335,7 @@ function App() {
                               </td>
                             </tr>
                           ))}
-                          {file.defects.length > 3 && (
+                          {(file.defects && file.defects.length > 3) && (
                             <tr>
                               <td colSpan="4" className="text-center">
                                 +{file.defects.length - 3} more defects
