@@ -90,6 +90,7 @@ function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [file, setFile] = useState(null);
+  const [description, setDescription] = useState('');
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -164,9 +165,8 @@ function App() {
     if (error) {
       setMessage(error.message);
     } else {
-      // Optionally, insert metadata into a table
       await supabase.from('file_metadata').insert([
-        { filename: fileName, original_name: file.name, uploaded_by: user.email, status: 'pending' }
+        { filename: fileName, original_name: file.name, uploaded_by: user.email, status: 'pending', description }
       ]);
       setMessage('File uploaded!');
       fetchFiles();
@@ -201,63 +201,6 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     setUser(null);
-  };
-
-  const handleFileUpload = (e) => {
-    e.preventDefault();
-    if (!uploadForm.file) {
-      setAlert({ type: 'warning', message: 'Please select a file!' });
-      return;
-    }
-
-    const file = uploadForm.file;
-    if (!file.name.toLowerCase().endsWith('.g85')) {
-      setAlert({ type: 'danger', message: 'Please upload a G85 format file!' });
-      return;
-    }
-
-    // Parse G85 file using the professional parser
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const content = event.target.result;
-        const mapData = parseG85(content);
-        
-        // Extract defect information for display
-        const defects = [];
-        for (const [coord, status] of mapData.dies) {
-          if (status === "EF") {
-            const [x, y] = coord.split(',').map(Number);
-            defects.push({
-              x: x,
-              y: y,
-              defectType: 'defect',
-              severity: 'major'
-            });
-          }
-        }
-
-        const newLot = {
-          id: Date.now(),
-          filename: file.name,
-          uploadedBy: user.email,
-          uploadDate: new Date().toISOString().split('T')[0],
-          status: 'pending',
-          description: uploadForm.description,
-          mapData: mapData,
-          defects: defects
-        };
-
-        setLots([...lots, newLot]);
-        setShowUploadModal(false);
-        setUploadForm({ file: null, description: '' });
-        setAlert({ type: 'success', message: 'G85 file uploaded and parsed successfully!' });
-      } catch (error) {
-        console.error('Error parsing G85 file:', error);
-        setAlert({ type: 'danger', message: 'Error parsing G85 file. Please ensure it\'s a valid G85 XML format.' });
-      }
-    };
-    reader.readAsText(file);
   };
 
   const handleApproval = async (lotId, status) => {
@@ -304,65 +247,65 @@ function App() {
               size="sm"
               onClick={() => setStatusFilter('all')}
             >
-              All ({lots.length})
+              All ({files.length})
             </Button>
             <Button
               variant={statusFilter === 'pending' ? 'warning' : 'outline-warning'}
               size="sm"
               onClick={() => setStatusFilter('pending')}
             >
-              Pending ({lots.filter(lot => lot.status === 'pending').length})
+              Pending ({files.filter(file => file.status === 'pending').length})
             </Button>
             <Button
               variant={statusFilter === 'approved' ? 'success' : 'outline-success'}
               size="sm"
               onClick={() => setStatusFilter('approved')}
             >
-              Approved ({lots.filter(lot => lot.status === 'approved').length})
+              Approved ({files.filter(file => file.status === 'approved').length})
             </Button>
             <Button
               variant={statusFilter === 'rejected' ? 'danger' : 'outline-danger'}
               size="sm"
               onClick={() => setStatusFilter('rejected')}
             >
-              Rejected ({lots.filter(lot => lot.status === 'rejected').length})
+              Rejected ({files.filter(file => file.status === 'rejected').length})
             </Button>
           </div>
         </div>
       </div>
 
       <div className="row">
-        {filteredLots.map(lot => (
-          <div key={lot.id} className="col-md-6 col-lg-4 mb-4">
+        {filteredFiles.map(file => (
+          <div key={file.id} className="col-md-6 col-lg-4 mb-4">
             <div className="card">
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h6 className="mb-0 text-truncate me-2" style={{ maxWidth: '70%' }} title={lot.filename}>
-                  {lot.filename}
+                <h6 className="mb-0 text-truncate me-2" style={{ maxWidth: '70%' }} title={file.filename}>
+                  {file.filename}
                 </h6>
                 <span className={`badge bg-${
-                  lot.status === 'pending' ? 'warning' : 
-                  lot.status === 'approved' ? 'success' : 'danger'
+                  file.status === 'pending' ? 'warning' : 
+                  file.status === 'approved' ? 'success' : 'danger'
                 } flex-shrink-0`}>
-                  {lot.status}
+                  {file.status}
                 </span>
               </div>
               <div className="card-body">
-                <p><strong>Uploaded by:</strong> {lot.uploadedBy}</p>
-                <p><strong>Date:</strong> {lot.uploadDate}</p>
-                {lot.mapData && (
+                <p><strong>Uploaded by:</strong> {file.uploaded_by}</p>
+                <p><strong>Date:</strong> {file.uploaded_at}</p>
+                {file.mapData && (
                   <>
-                    <p><strong>Product ID:</strong> {lot.mapData.header.ProductId || 'N/A'}</p>
-                    <p><strong>Lot ID:</strong> {lot.mapData.header.LotId || 'N/A'}</p>
-                    <p><strong>Wafer Size:</strong> {lot.mapData.header.WaferSize || 'N/A'}</p>
-                    <p><strong>Grid Size:</strong> {lot.mapData.header.Rows || 'N/A'} x {lot.mapData.header.Columns || 'N/A'}</p>
+                    <p><strong>Product ID:</strong> {file.mapData.header.ProductId || 'N/A'}</p>
+                    <p><strong>Lot ID:</strong> {file.mapData.header.LotId || 'N/A'}</p>
+                    <p><strong>Wafer Size:</strong> {file.mapData.header.WaferSize || 'N/A'}</p>
+                    <p><strong>Grid Size:</strong> {file.mapData.header.Rows || 'N/A'} x {file.mapData.header.Columns || 'N/A'}</p>
                   </>
                 )}
-                <p><strong>Defects found:</strong> {lot.defects.length}</p>
-                {lot.description && (
-                  <p><strong>Description:</strong> {lot.description}</p>
+                <p><strong>Defects found:</strong> {file.defects.length}</p>
+                {file.description && (
+                  <p><strong>Description:</strong> {file.description}</p>
                 )}
                 
-                {lot.defects.length > 0 && (
+                {file.defects.length > 0 && (
                   <div className="mt-3">
                     <h6>Defects:</h6>
                     <div className="table-responsive">
@@ -376,7 +319,7 @@ function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {lot.defects.slice(0, 3).map((defect, index) => (
+                          {file.defects.slice(0, 3).map((defect, index) => (
                             <tr key={index}>
                               <td>{defect.x}</td>
                               <td>{defect.y}</td>
@@ -390,10 +333,10 @@ function App() {
                               </td>
                             </tr>
                           ))}
-                          {lot.defects.length > 3 && (
+                          {file.defects.length > 3 && (
                             <tr>
                               <td colSpan="4" className="text-center">
-                                +{lot.defects.length - 3} more defects
+                                +{file.defects.length - 3} more defects
                               </td>
                             </tr>
                           )}
@@ -408,25 +351,25 @@ function App() {
                     variant="info" 
                     size="sm" 
                     className="me-2"
-                    onClick={() => openVisualizer(lot)}
+                    onClick={() => openVisualizer(file)}
                   >
                     View Wafer Map
                   </Button>
                   
-                  {user?.role === 'admin' && lot.status === 'pending' && (
+                  {user?.role === 'admin' && file.status === 'pending' && (
                     <>
                       <Button 
                         variant="success" 
                         size="sm" 
                         className="me-2"
-                        onClick={() => handleApproval(lot.id, 'approved')}
+                        onClick={() => handleApproval(file.id, 'approved')}
                       >
                         Approve
                       </Button>
                       <Button 
                         variant="danger" 
                         size="sm"
-                        onClick={() => handleApproval(lot.id, 'rejected')}
+                        onClick={() => handleApproval(file.id, 'rejected')}
                       >
                         Reject
                       </Button>
@@ -592,13 +535,13 @@ function App() {
             <Modal.Title>Upload G85 Lot File</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <Form onSubmit={handleFileUpload}>
+            <Form onSubmit={handleUpload}>
               <Form.Group className="mb-3">
                 <Form.Label>G85 File</Form.Label>
                 <Form.Control
                   type="file"
                   accept=".g85"
-                  onChange={(e) => setUploadForm({...uploadForm, file: e.target.files[0]})}
+                  onChange={e => setFile(e.target.files[0])}
                   required
                 />
                 <Form.Text className="text-muted">
@@ -610,8 +553,8 @@ function App() {
                 <Form.Control
                   as="textarea"
                   rows={3}
-                  value={uploadForm.description}
-                  onChange={(e) => setUploadForm({...uploadForm, description: e.target.value})}
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
                   placeholder="Add any additional notes about this lot..."
                 />
               </Form.Group>
