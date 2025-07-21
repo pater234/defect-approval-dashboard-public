@@ -216,9 +216,9 @@ function App() {
   };
 
   // Filter lots based on status
-  const filteredLots = statusFilter === 'all' 
-    ? lots 
-    : lots.filter(lot => lot.status === statusFilter);
+  const filteredFiles = statusFilter === 'all' 
+    ? files 
+    : files.filter(file => file.status === statusFilter);
 
   const Dashboard = () => (
     <Container className="mt-4">
