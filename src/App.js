@@ -327,8 +327,8 @@ function App() {
           <div key={file.id} className="col-md-6 col-lg-4 mb-4">
             <div className="card">
               <div className="card-header d-flex justify-content-between align-items-center">
-                <h6 className="mb-0 text-truncate me-2" style={{ maxWidth: '70%' }} title={file.filename}>
-                  {file.filename}
+                <h6 className="mb-0 text-truncate me-2" style={{ maxWidth: '70%' }} title={file.original_name || file.filename}>
+                  {file.original_name || file.filename}
                 </h6>
                 <span className={`badge bg-${
                   file.status === 'pending' ? 'warning' : 
