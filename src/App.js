@@ -10,6 +10,7 @@ import CryptoJS from 'crypto-js';
 import { SignJWT, jwtVerify } from 'jose';
 import jwt_decode from 'jwt-decode';
 import { v4 as uuidv4 } from 'uuid';
+import emailjs from 'emailjs-com';
 
 // Mock data storage (in production, this would be a database)
 const mockUsers = [
@@ -76,6 +77,32 @@ async function verifyJWT(token, secret) {
   } catch (e) {
     return null;
   }
+}
+
+// EmailJS config (replace with your actual IDs)
+const EMAILJS_SERVICE_ID = 'service_9rerkol';
+const EMAILJS_TEMPLATE_ID = 'template_8ku6wsx';
+const EMAILJS_USER_ID = 'WaesjEYNohlNcScUt';
+
+// Send approval email to uploader
+function sendApprovalEmail(toEmail, lotIds, filenames) {
+  emailjs.send(
+    EMAILJS_SERVICE_ID,
+    EMAILJS_TEMPLATE_ID,
+    {
+      to_email: toEmail,
+      lot_ids: lotIds.join(', '),
+      filenames: filenames.join(', ')
+    },
+    EMAILJS_USER_ID
+  ).then(
+    (result) => {
+      console.log('Email sent!', result.text);
+    },
+    (error) => {
+      console.error('Email error:', error.text);
+    }
+  );
 }
 
 function App() {
@@ -473,6 +500,11 @@ function App() {
               <Button variant="success" className="me-2" onClick={async () => {
                 await Promise.all(groupFiles.map(f => supabase.from('file_metadata').update({ status: 'approved' }).eq('id', f.id)));
                 fetchFiles();
+                // Send approval email to uploader
+                const uploaderEmail = groupFiles[0].uploaded_by;
+                const lotIds = groupFiles.map(f => f.mapData?.header?.LotId || '');
+                const filenames = groupFiles.map(f => f.original_name || f.filename);
+                sendApprovalEmail(uploaderEmail, lotIds, filenames);
                 setSelectedLot(null);
               }}>Approve All</Button>
               <Button variant="danger" onClick={async () => {
