@@ -207,11 +207,17 @@ function App() {
     setLoading(true);
     const { data, error } = await supabase.from('file_metadata').select('*').order('uploaded_at', { ascending: false });
     if (!error && data) {
-      setFiles(data.map(f => ({
-        ...f,
-        mapData: f.mapData ? JSON.parse(f.mapData) : undefined,
-        defects: f.defects ? JSON.parse(f.defects) : []
-      })));
+      setFiles(data.map(f => {
+        let mapData = f.mapData ? JSON.parse(f.mapData) : undefined;
+        if (mapData && mapData.dies && !(mapData.dies instanceof Map)) {
+          mapData.dies = new Map(Object.entries(mapData.dies));
+        }
+        return {
+          ...f,
+          mapData,
+          defects: f.defects ? JSON.parse(f.defects) : []
+        };
+      }));
     }
     setLoading(false);
   };
