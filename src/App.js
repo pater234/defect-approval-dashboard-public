@@ -9,6 +9,7 @@ import './App.css';
 import CryptoJS from 'crypto-js';
 import { SignJWT, jwtVerify } from 'jose';
 import jwt_decode from 'jwt-decode';
+import { v4 as uuidv4 } from 'uuid';
 
 // Mock data storage (in production, this would be a database)
 const mockUsers = [
@@ -97,6 +98,9 @@ function App() {
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [registerForm, setRegisterForm] = useState({ email: '', password: '', adminSecret: '' });
   const [registerMessage, setRegisterMessage] = useState('');
+  const [filesToUpload, setFilesToUpload] = useState([]);
+  const [groupFiles, setGroupFiles] = useState([]);
+  const [groupIndex, setGroupIndex] = useState(0);
 
   // Registration handler (local auth)
   const handleRegister = async (e) => {
@@ -157,48 +161,51 @@ function App() {
   // Handle file upload
   const handleUpload = async (e) => {
     e.preventDefault();
-    if (!file) return;
+    if (!filesToUpload.length) return;
     setLoading(true);
     setMessage('');
-    const fileName = `${Date.now()}_${file.name}`;
-    console.log('Uploading file:', file, file instanceof File, file.size);
-    // Parse G85 file for mapData and defects
-    const fileText = await file.text();
-    let mapData = null;
-    let defects = [];
-    try {
-      mapData = parseG85(fileText);
-      // Extract defect information for display
-      for (const [coord, status] of mapData.dies) {
-        if (status === "EF") {
-          const [x, y] = coord.split(',').map(Number);
-          defects.push({ x, y, defectType: 'defect', severity: 'major' });
+    const uploadGroupId = uuidv4();
+    for (const file of filesToUpload) {
+      const fileName = `${Date.now()}_${file.name}`;
+      console.log('Uploading file:', file, file instanceof File, file.size);
+      // Parse G85 file for mapData and defects
+      const fileText = await file.text();
+      let mapData = null;
+      let defects = [];
+      try {
+        mapData = parseG85(fileText);
+        for (const [coord, status] of mapData.dies) {
+          if (status === "EF") {
+            const [x, y] = coord.split(',').map(Number);
+            defects.push({ x, y, defectType: 'defect', severity: 'major' });
+          }
         }
+      } catch (err) {
+        setMessage('Error parsing G85 file.');
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      setMessage('Error parsing G85 file.');
-      setLoading(false);
-      return;
+      const { error } = await supabase.storage.from('uploads').upload(fileName, file, { upsert: true });
+      if (error) {
+        console.error('Supabase upload error:', error);
+        setMessage(error.message);
+      } else {
+        await supabase.from('file_metadata').insert([
+          {
+            filename: fileName,
+            original_name: file.name,
+            uploaded_by: user.email,
+            status: 'pending',
+            description,
+            mapData: JSON.stringify(mapData),
+            defects: JSON.stringify(defects),
+            upload_group_id: uploadGroupId
+          }
+        ]);
+      }
     }
-    const { data, error } = await supabase.storage.from('uploads').upload(fileName, file, { upsert: true });
-    if (error) {
-      console.error('Supabase upload error:', error);
-      setMessage(error.message);
-    } else {
-      await supabase.from('file_metadata').insert([
-        {
-          filename: fileName,
-          original_name: file.name,
-          uploaded_by: user.email,
-          status: 'pending',
-          description,
-          mapData: JSON.stringify(mapData),
-          defects: JSON.stringify(defects)
-        }
-      ]);
-      setMessage('File uploaded!');
-      fetchFiles();
-    }
+    setMessage('Files uploaded!');
+    fetchFiles();
     setLoading(false);
   };
 
@@ -252,15 +259,27 @@ function App() {
   };
 
   const openVisualizer = async (file) => {
-    // Get the public URL for the file
+    // Get all files in the same group
+    const group = files.filter(f => f.upload_group_id === file.upload_group_id);
+    setGroupFiles(group);
+    const idx = group.findIndex(f => f.id === file.id);
+    setGroupIndex(idx);
+    // Fetch and parse the first file
+    await loadVisualizerFile(group[idx]);
+  };
+  const loadVisualizerFile = async (file) => {
     const publicUrl = supabase.storage.from('uploads').getPublicUrl(file.filename).data.publicUrl;
-    // Fetch the file contents
     const response = await fetch(publicUrl);
     const g85Text = await response.text();
-    // Parse the G85 file
     const mapData = parseG85(g85Text);
-    // Set the selected lot with parsed mapData
     setSelectedLot({ ...file, mapData });
+  };
+  const handleVisualizerNav = async (direction) => {
+    let newIndex = groupIndex + direction;
+    if (newIndex < 0) newIndex = groupFiles.length - 1;
+    if (newIndex >= groupFiles.length) newIndex = 0;
+    setGroupIndex(newIndex);
+    await loadVisualizerFile(groupFiles[newIndex]);
   };
 
   // Filter lots based on status
@@ -434,12 +453,35 @@ function App() {
       {selectedLot && selectedLot.mapData && (
         <div className="mt-4">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3>Wafer Map: {selectedLot.filename}</h3>
-            <Button variant="outline-secondary" size="sm" onClick={() => setSelectedLot(null)}>
-              Close Map
-            </Button>
+            <h3>Wafer Map: {selectedLot.original_name || selectedLot.filename}</h3>
+            <div>
+              {groupFiles.length > 1 && (
+                <>
+                  <Button variant="outline-secondary" size="sm" onClick={() => handleVisualizerNav(-1)}>&larr;</Button>
+                  <span style={{ margin: '0 10px' }}>{groupIndex + 1} / {groupFiles.length}</span>
+                  <Button variant="outline-secondary" size="sm" onClick={() => handleVisualizerNav(1)}>&rarr;</Button>
+                </>
+              )}
+              <Button variant="outline-secondary" size="sm" onClick={() => setSelectedLot(null)}>
+                Close Map
+              </Button>
+            </div>
           </div>
           <WaferMapVisualization mapData={selectedLot.mapData} />
+          {user?.role === 'admin' && groupFiles.length > 0 && (
+            <div className="mt-3">
+              <Button variant="success" className="me-2" onClick={async () => {
+                await Promise.all(groupFiles.map(f => supabase.from('file_metadata').update({ status: 'approved' }).eq('id', f.id)));
+                fetchFiles();
+                setSelectedLot(null);
+              }}>Approve All</Button>
+              <Button variant="danger" onClick={async () => {
+                await Promise.all(groupFiles.map(f => supabase.from('file_metadata').update({ status: 'rejected' }).eq('id', f.id)));
+                fetchFiles();
+                setSelectedLot(null);
+              }}>Reject All</Button>
+            </div>
+          )}
         </div>
       )}
     </Container>
@@ -588,7 +630,8 @@ function App() {
                 <Form.Label>G85 File</Form.Label>
                 <Form.Control
                   type="file"
-                  onChange={e => setFile(e.target.files[0])}
+                  multiple
+                  onChange={e => setFilesToUpload(Array.from(e.target.files))}
                   required
                 />
                 <Form.Text className="text-muted">
