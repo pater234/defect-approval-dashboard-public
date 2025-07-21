@@ -162,13 +162,39 @@ function App() {
     setMessage('');
     const fileName = `${Date.now()}_${file.name}`;
     console.log('Uploading file:', file, file instanceof File, file.size);
+    // Parse G85 file for mapData and defects
+    const fileText = await file.text();
+    let mapData = null;
+    let defects = [];
+    try {
+      mapData = parseG85(fileText);
+      // Extract defect information for display
+      for (const [coord, status] of mapData.dies) {
+        if (status === "EF") {
+          const [x, y] = coord.split(',').map(Number);
+          defects.push({ x, y, defectType: 'defect', severity: 'major' });
+        }
+      }
+    } catch (err) {
+      setMessage('Error parsing G85 file.');
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase.storage.from('uploads').upload(fileName, file, { upsert: true });
     if (error) {
       console.error('Supabase upload error:', error);
       setMessage(error.message);
     } else {
       await supabase.from('file_metadata').insert([
-        { filename: fileName, original_name: file.name, uploaded_by: user.email, status: 'pending', description }
+        {
+          filename: fileName,
+          original_name: file.name,
+          uploaded_by: user.email,
+          status: 'pending',
+          description,
+          mapData: JSON.stringify(mapData),
+          defects: JSON.stringify(defects)
+        }
       ]);
       setMessage('File uploaded!');
       fetchFiles();
@@ -176,11 +202,17 @@ function App() {
     setLoading(false);
   };
 
-  // Fetch files from Supabase table
+  // When fetching files, parse mapData and defects from JSON
   const fetchFiles = async () => {
     setLoading(true);
     const { data, error } = await supabase.from('file_metadata').select('*').order('uploaded_at', { ascending: false });
-    if (!error) setFiles(data);
+    if (!error && data) {
+      setFiles(data.map(f => ({
+        ...f,
+        mapData: f.mapData ? JSON.parse(f.mapData) : undefined,
+        defects: f.defects ? JSON.parse(f.defects) : []
+      })));
+    }
     setLoading(false);
   };
 
