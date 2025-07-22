@@ -83,6 +83,7 @@ async function verifyJWT(token, secret) {
 const EMAILJS_SERVICE_ID = 'service_9rerkol';
 const EMAILJS_TEMPLATE_ID = 'template_8ku6wsx';
 const EMAILJS_USER_ID = 'WaesjEYNohlNcScUt';
+const EMAILJS_REJECTION_TEMPLATE_ID = 'template_f4tgoaj'; // <-- Replace with your new template ID
 
 // Send approval email to uploader
 function sendApprovalEmail(toEmail, lotIds, filenames) {
@@ -101,6 +102,28 @@ function sendApprovalEmail(toEmail, lotIds, filenames) {
     },
     (error) => {
       console.error('Email error:', error.text);
+    }
+  );
+}
+
+// Send rejection email to uploader
+function sendRejectionEmail(toEmail, lotIds, filenames, reason) {
+  emailjs.send(
+    EMAILJS_SERVICE_ID,
+    EMAILJS_REJECTION_TEMPLATE_ID,
+    {
+      to_email: toEmail,
+      lot_ids: lotIds.join(', '),
+      filenames: filenames.join(', '),
+      reason: reason
+    },
+    EMAILJS_USER_ID
+  ).then(
+    (result) => {
+      console.log('Rejection email sent!', result.text);
+    },
+    (error) => {
+      console.error('Rejection email error:', error.text);
     }
   );
 }
@@ -456,14 +479,32 @@ function App() {
                         variant="success" 
                         size="sm" 
                         className="me-2"
-                        onClick={() => handleApproval(file.id, 'approved')}
+                        onClick={async () => {
+                          await supabase.from('file_metadata').update({ status: 'approved' }).eq('id', file.id);
+                          fetchFiles();
+                          // Send approval email to uploader
+                          const uploaderEmail = file.uploaded_by;
+                          const lotIds = [file.mapData?.header?.LotId || ''];
+                          const filenames = [file.original_name || file.filename];
+                          sendApprovalEmail(uploaderEmail, lotIds, filenames);
+                        }}
                       >
                         Approve
                       </Button>
                       <Button 
                         variant="danger" 
                         size="sm"
-                        onClick={() => handleApproval(file.id, 'rejected')}
+                        onClick={async () => {
+                          const reason = window.prompt('Enter a reason for rejection:');
+                          if (reason === null) return; // Cancelled
+                          await supabase.from('file_metadata').update({ status: 'rejected' }).eq('id', file.id);
+                          fetchFiles();
+                          // Send rejection email to uploader
+                          const uploaderEmail = file.uploaded_by;
+                          const lotIds = [file.mapData?.header?.LotId || ''];
+                          const filenames = [file.original_name || file.filename];
+                          sendRejectionEmail(uploaderEmail, lotIds, filenames, reason);
+                        }}
                       >
                         Reject
                       </Button>
@@ -508,8 +549,15 @@ function App() {
                 setSelectedLot(null);
               }}>Approve All</Button>
               <Button variant="danger" onClick={async () => {
+                const reason = window.prompt('Enter a reason for rejection:');
+                if (reason === null) return; // Cancelled
                 await Promise.all(groupFiles.map(f => supabase.from('file_metadata').update({ status: 'rejected' }).eq('id', f.id)));
                 fetchFiles();
+                // Send rejection email to uploader
+                const uploaderEmail = groupFiles[0].uploaded_by;
+                const lotIds = groupFiles.map(f => f.mapData?.header?.LotId || '');
+                const filenames = groupFiles.map(f => f.original_name || f.filename);
+                sendRejectionEmail(uploaderEmail, lotIds, filenames, reason);
                 setSelectedLot(null);
               }}>Reject All</Button>
             </div>
