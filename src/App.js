@@ -332,10 +332,12 @@ function App() {
     await loadVisualizerFile(groupFiles[newIndex]);
   };
 
-  // Filter lots based on status
-  const filteredFiles = statusFilter === 'all' 
-    ? files 
-    : files.filter(file => file.status === statusFilter);
+  const filteredFiles =
+    statusFilter === 'all'
+      ? files
+      : statusFilter === 'my'
+        ? files.filter(file => file.uploaded_by === user?.email)
+        : files.filter(file => file.status === statusFilter);
 
   const Dashboard = () => (
     <Container className="mt-4">
@@ -386,6 +388,13 @@ function App() {
               onClick={() => setStatusFilter('rejected')}
             >
               Rejected ({files.filter(file => file.status === 'rejected').length})
+            </Button>
+            <Button
+              variant={statusFilter === 'my' ? 'info' : 'outline-info'}
+              size="sm"
+              onClick={() => setStatusFilter('my')}
+            >
+              My Lots ({files.filter(file => file.uploaded_by === user?.email).length})
             </Button>
           </div>
         </div>
