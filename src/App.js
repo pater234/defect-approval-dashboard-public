@@ -530,6 +530,21 @@ function App() {
                       </Button>
                     </>
                   )}
+                  {user?.role === 'admin' && (
+                    <Button 
+                      variant="danger" 
+                      size="sm"
+                      onClick={async () => {
+                        if (window.confirm('Are you sure you want to delete this lot?')) {
+                          await supabase.storage.from('uploads').remove([file.filename]);
+                          await supabase.from('file_metadata').delete().eq('id', file.id);
+                          fetchFiles();
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
