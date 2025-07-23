@@ -79,6 +79,14 @@ async function verifyJWT(token, secret) {
   }
 }
 
+// Helper to delete a file from Supabase Storage and metadata
+async function deleteFileAndMetadata(file) {
+  // Delete from storage
+  await supabase.storage.from('uploads').remove([file.filename]);
+  // Delete from metadata
+  await supabase.from('file_metadata').delete().eq('id', file.id);
+}
+
 // EmailJS config (replace with your actual IDs)
 const EMAILJS_SERVICE_ID = 'service_9rerkol';
 const EMAILJS_TEMPLATE_ID = 'template_8ku6wsx';
@@ -513,6 +521,9 @@ function App() {
                           const lotIds = [file.mapData?.header?.LotId || ''];
                           const filenames = [file.original_name || file.filename];
                           sendRejectionEmail(uploaderEmail, lotIds, filenames, reason);
+                          // Delete file and metadata
+                          await deleteFileAndMetadata(file);
+                          fetchFiles();
                         }}
                       >
                         Reject
@@ -567,6 +578,9 @@ function App() {
                 const lotIds = groupFiles.map(f => f.mapData?.header?.LotId || '');
                 const filenames = groupFiles.map(f => f.original_name || f.filename);
                 sendRejectionEmail(uploaderEmail, lotIds, filenames, reason);
+                // Delete all files and metadata
+                await Promise.all(groupFiles.map(f => deleteFileAndMetadata(f)));
+                fetchFiles();
                 setSelectedLot(null);
               }}>Reject All</Button>
             </div>
