@@ -54,10 +54,10 @@ const convertG85ToWaferMap = (mapData) => {
   return mapData;
 };
 
-const ADMIN_SECRET = 'admin123'; // <-- Set your admin secret here
+const ADMIN_SECRET = ''; // <-- Set your admin secret here
 
 // JWT secret for signing tokens (in production, keep this secret and secure)
-const JWT_SECRET = 'secret1213';
+const JWT_SECRET = '';
 
 // Helper to create JWT in browser
 async function createJWT(payload, secret) {
@@ -88,10 +88,10 @@ async function deleteFileAndMetadata(file) {
 }
 
 // EmailJS config (replace with your actual IDs)
-const EMAILJS_SERVICE_ID = 'service_9rerkol';
-const EMAILJS_TEMPLATE_ID = 'template_8ku6wsx';
-const EMAILJS_USER_ID = 'WaesjEYNohlNcScUt';
-const EMAILJS_REJECTION_TEMPLATE_ID = 'template_f4tgoaj'; // <-- Replace with your new template ID
+const EMAILJS_SERVICE_ID = '';
+const EMAILJS_TEMPLATE_ID = '';
+const EMAILJS_USER_ID = '';
+const EMAILJS_REJECTION_TEMPLATE_ID = ''; // <-- Replace with your new template ID
 
 // Send approval email to uploader
 function sendApprovalEmail(toEmail, lotIds, filenames) {
